@@ -1,0 +1,943 @@
+{
+  "uid": "a3-imdb",
+  "title": "A3 \u2014 IMDB Dataset & Model Versions",
+  "tags": [
+    "A3",
+    "mlflow"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "options": {
+        "mode": "markdown",
+        "content": "## \ud83c\udfac IMDB Sentiment \u2014 what happened to our model?\n**1. The A1 model** (TF-IDF + Logistic Regression) was trained on **dataset v1**: 50K long IMDB reviews, 50% positive.\n**2. The data drifted \u2192 dataset v2**: reviews got ~75% shorter, new slang showed up (*mid, fire, goated*), and 70% of reviews became negative.\n**3. The A1 model struggled** on the new reviews (see the red drop below), because it had never seen the new words.\n**4. We retrained \u2192 model v2** on dataset v2 (with balanced class weights). It recovers on the drifted reviews.\n*Everything here is read live from MLflow's database (runs, metrics, model registry).*"
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 6
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Dataset versions",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC) SELECT COUNT(*) FROM r",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Registered model versions",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) FROM model_versions WHERE name = 'imdb-sentiment'",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 6,
+        "y": 6,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "A1 model: accuracy drop on drifted data",
+      "description": "Accuracy on v2 test minus accuracy on v1 test, for the A1 model (percentage points)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (MAX(CASE WHEN m.key='accuracy_on_v2_test' THEN m.value END)\n       - MAX(CASE WHEN m.key='accuracy_on_v1_test' THEN m.value END)) * 100 AS drop\nFROM model_versions mv\nLEFT JOIN registered_model_aliases a ON a.name = mv.name AND a.version = mv.version\nJOIN latest_metrics m ON m.run_uuid = mv.run_id\nWHERE mv.name = 'imdb-sentiment' AND a.alias = 'a1_baseline'",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Retrained model: gain on drifted data",
+      "description": "Accuracy on the drifted test set: model v2 minus model v1 (percentage points)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (MAX(CASE WHEN a.alias='drift_retrained' THEN m.value END)\n       - MAX(CASE WHEN a.alias='a1_baseline' THEN m.value END)) * 100 AS gain\nFROM model_versions mv\nJOIN registered_model_aliases a ON a.name = mv.name AND a.version = mv.version\nJOIN latest_metrics m ON m.run_uuid = mv.run_id AND m.key = 'accuracy_on_v2_test'\nWHERE mv.name = 'imdb-sentiment'",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 18,
+        "y": 6,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udcc1 Dataset statistics",
+      "collapsed": false,
+      "panels": [],
+      "id": 6,
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 1
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Dataset versions (metadata + stats)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT replace(r.name, 'dataset-', '') AS version,\n  MAX(CASE WHEN p.key='digest' THEN p.value END) AS digest,\n  MAX(CASE WHEN p.key='drift_recipe' THEN p.value END) AS drift_recipe,\n  MAX(CASE WHEN m.key = 'n_rows' THEN m.value END) AS \"rows\", MAX(CASE WHEN m.key = 'n_train' THEN m.value END) AS \"train\", MAX(CASE WHEN m.key = 'n_test' THEN m.value END) AS \"test\",\n  MAX(CASE WHEN m.key = 'positive_rate' THEN m.value END) AS \"positive rate\", MAX(CASE WHEN m.key = 'avg_words' THEN m.value END) AS \"avg words\",\n  MAX(CASE WHEN m.key = 'vocab_size' THEN m.value END) AS \"vocabulary\"\nFROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid\nLEFT JOIN params p ON p.run_uuid = r.run_uuid\nGROUP BY r.name ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Rows per version",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT replace(r.name, 'dataset-', 'dataset ') AS version, MAX(CASE WHEN m.key = 'n_rows' THEN m.value END) AS \"Rows per version\"\nFROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid GROUP BY r.name ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "version",
+        "orientation": "auto",
+        "showValue": "always",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "stacking": "none",
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Average words per review",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT replace(r.name, 'dataset-', 'dataset ') AS version, MAX(CASE WHEN m.key = 'avg_words' THEN m.value END) AS \"Average words per review\"\nFROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid GROUP BY r.name ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "version",
+        "orientation": "auto",
+        "showValue": "always",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "stacking": "none",
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Share of positive reviews",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT replace(r.name, 'dataset-', 'dataset ') AS version, MAX(CASE WHEN m.key = 'positive_rate' THEN m.value END) AS \"Share of positive reviews\"\nFROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid GROUP BY r.name ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "version",
+        "orientation": "auto",
+        "showValue": "always",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "stacking": "none",
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "row",
+      "title": "\ud83c\udf0a Drift indicators (dataset v2 vs v1)",
+      "collapsed": false,
+      "panels": [],
+      "id": 11,
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 1
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Review length PSI",
+      "description": "Population Stability Index of review length. <0.1 = stable, 0.1-0.25 = moderate drift, >0.25 = major drift",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT m.value FROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid\nWHERE r.name = 'dataset-v2' AND m.key = 'drift_length_psi'",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.25
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Average length change",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT m.value FROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid\nWHERE r.name = 'dataset-v2' AND m.key = 'drift_avg_words_change_pct'",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -25
+              },
+              {
+                "color": "green",
+                "value": -10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 6,
+        "y": 26,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Positive rate shift",
+      "description": "Change in the share of positive reviews (percentage points)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT value * 100 FROM (WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT m.value FROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid\nWHERE r.name = 'dataset-v2' AND m.key =  'drift_positive_rate_shift') t",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -10
+              },
+              {
+                "color": "green",
+                "value": -5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 14,
+      "gridPos": {
+        "x": 12,
+        "y": 26,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Vocabulary size change",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT DISTINCT ON (r.name) r.run_uuid, r.name FROM runs r\n  JOIN experiments e ON e.experiment_id = r.experiment_id\n  WHERE e.name = 'imdb-dataset-versions' AND r.lifecycle_stage = 'active'\n  ORDER BY r.name, r.start_time DESC)\nSELECT m.value FROM r JOIN latest_metrics m ON m.run_uuid = r.run_uuid\nWHERE r.name = 'dataset-v2' AND m.key = 'drift_vocab_size_change_pct'",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -25
+              },
+              {
+                "color": "green",
+                "value": -10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "id": 15,
+      "gridPos": {
+        "x": 18,
+        "y": 26,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "row",
+      "title": "\ud83e\udd16 Model performance (MLflow Model Registry)",
+      "collapsed": false,
+      "panels": [],
+      "id": 16,
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 1
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "ACCURACY \u2014 each model on each test set",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT 'model v' || mv.version || ' (' || COALESCE(a.alias, '-') || ')' AS model,\n  MAX(CASE WHEN m.key = 'accuracy_on_v1_test' THEN m.value END) AS \"on v1 test (original)\",\n  MAX(CASE WHEN m.key = 'accuracy_on_v2_test' THEN m.value END) AS \"on v2 test (drifted)\"\nFROM model_versions mv\nLEFT JOIN registered_model_aliases a ON a.name = mv.name AND a.version = mv.version\nJOIN latest_metrics m ON m.run_uuid = mv.run_id\nWHERE mv.name = 'imdb-sentiment' GROUP BY mv.version, a.alias ORDER BY mv.version",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "model",
+        "orientation": "auto",
+        "showValue": "always",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "stacking": "none",
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 17,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "F1 \u2014 each model on each test set",
+      "description": "",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT 'model v' || mv.version || ' (' || COALESCE(a.alias, '-') || ')' AS model,\n  MAX(CASE WHEN m.key = 'f1_on_v1_test' THEN m.value END) AS \"on v1 test (original)\",\n  MAX(CASE WHEN m.key = 'f1_on_v2_test' THEN m.value END) AS \"on v2 test (drifted)\"\nFROM model_versions mv\nLEFT JOIN registered_model_aliases a ON a.name = mv.name AND a.version = mv.version\nJOIN latest_metrics m ON m.run_uuid = mv.run_id\nWHERE mv.name = 'imdb-sentiment' GROUP BY mv.version, a.alias ORDER BY mv.version",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "model",
+        "orientation": "auto",
+        "showValue": "always",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "stacking": "none",
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 18,
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Model registry",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "mlflow-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT mv.version, COALESCE(a.alias, '-') AS alias,\n  MAX(CASE WHEN t.key='dataset_version' THEN t.value END) AS trained_on,\n  to_timestamp(mv.creation_time / 1000) AS registered_at,\n  MAX(CASE WHEN m.key = 'accuracy' THEN m.value END) AS \"accuracy (own test)\", MAX(CASE WHEN m.key = 'f1' THEN m.value END) AS \"f1 (own test)\",\n  MAX(CASE WHEN m.key = 'precision' THEN m.value END) AS \"precision\", MAX(CASE WHEN m.key = 'recall' THEN m.value END) AS \"recall\", MAX(CASE WHEN m.key = 'roc_auc' THEN m.value END) AS \"roc_auc\",\n  mv.description\nFROM model_versions mv\nLEFT JOIN registered_model_aliases a ON a.name = mv.name AND a.version = mv.version\nJOIN latest_metrics m ON m.run_uuid = mv.run_id\nLEFT JOIN model_version_tags t ON t.name = mv.name AND t.version = mv.version WHERE mv.name = 'imdb-sentiment'\nGROUP BY mv.version, a.alias, mv.creation_time, mv.description ORDER BY mv.version",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "id": 19,
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 24,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "mlflow-db"
+      }
+    }
+  ]
+}

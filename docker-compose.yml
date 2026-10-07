@@ -1,0 +1,66 @@
+# One command starts the whole system:  docker compose up -d --build
+services:
+
+  # 1) Database where MLflow stores runs, metrics, params and the model registry
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+      POSTGRES_DB: mlflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow"]
+      interval: 5s
+      retries: 10
+
+  # 2) MLflow tracking server + model registry  ->  http://localhost:5000
+  mlflow:
+    build: .
+    image: a3-python
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri postgresql://mlflow:mlflow@postgres:5432/mlflow
+      --artifacts-destination /mlartifacts --serve-artifacts
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlartifacts:/mlartifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # 3) Streamlit app (selectors, predictions, charts)  ->  http://localhost:8501
+  #    Also used to run the Step 1 and Step 2 scripts.
+  app:
+    build: .
+    image: a3-python
+    command: streamlit run app/app.py --server.port 8501 --server.address 0.0.0.0
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./:/project
+    depends_on:
+      - mlflow
+
+  # 4) Grafana dashboard, reads MLflow's database directly  ->  http://localhost:3000
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/a3_dashboard.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
+  mlartifacts:
